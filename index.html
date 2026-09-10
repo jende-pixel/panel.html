@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWQ SECURITY // Next-Gen Anti-DDoS & Web Application Firewall</title>
+    <link rel="stylesheet" href="https://cloudflare.com">
+    <style>
+        :root {
+            --awq-bg-white: #ffffff;      /* Temiz beyaz ana arka plan */
+            --awq-bg-card: #f8f9fa;       /* Hafif gri-beyaz kurumsal kartlar */
+            --awq-accent-blue: #0066ff;   /* İstediğiniz parlak siber mavi */
+            --awq-accent-glow: #0052cc;   /* Koyu mavi tonları */
+            --awq-text-main: #111111;     /* Beyaz temada okunabilir koyu yazılar */
+            --awq-text-muted: #666666;    /* Gri yardımcı yazılar */
+            --awq-border: #e2e8f0;        /* Temiz ince kenarlık çizgileri */
+            --awq-neon-green: #00cc44;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif; }
+        body {
+            background-color: var(--awq-bg-white); color: var(--awq-text-main);
+            line-height: 1.6; overflow-x: hidden;
+        }
+        /* --- AWQ WAF BEYAZ UAM DOĞRULAMA EKRANI --- */
+        #awq-uam-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--awq-bg-white); z-index: 99999;
+            display: flex; flex-direction: column; justify-content: center; align-items: center; transition: opacity 0.5s ease, visibility 0.5s ease;
+        }
+        .awq-uam-wrapper { width: 90%; max-width: 450px; text-align: center; }
+        .awq-uam-title { font-size: 26px; font-weight: 800; color: var(--awq-text-main); margin-bottom: 12px; letter-spacing: 0.5px; }
+        .awq-uam-title span { color: var(--awq-accent-blue); }
+        .awq-uam-loading-text { color: var(--awq-text-muted); font-size: 15px; margin-bottom: 20px; transition: all 0.5s ease; position: relative; }
+        .awq-uam-bar-bg { width: 100%; height: 5px; background: #e2e8f0; border-radius: 3px; overflow: hidden; margin-bottom: 30px; transition: all 0.5s ease; }
+        .awq-uam-bar-fill { width: 0%; height: 100%; background: var(--awq-accent-blue); border-radius: 3px; }
+        .awq-fade-slide-out { opacity: 0; transform: translateX(50px); filter: blur(5px); }
+        /* Beyaz Captcha Kutusu */
+        .awq-captcha-box {
+            background: var(--awq-bg-card); border: 1px solid var(--awq-border); border-radius: 8px; padding: 22px;
+            display: none; justify-content: space-between; align-items: center; box-shadow: 0 10px 25px rgba(0, 102, 255, 0.05); opacity: 0; transform: scale(0.9); transition: all 0.5s ease;
+        }
+        .awq-captcha-left { display: flex; align-items: center; gap: 15px; cursor: pointer; }
+        .awq-captcha-check { width: 26px; height: 26px; border: 2px solid #cbd5e1; border-radius: 4px; display: flex; align-items: center; justify-content: center; transition: 0.3s; background: #ffffff; }
+        .awq-captcha-check:hover { border-color: var(--awq-accent-blue); }
+        .awq-captcha-check i { font-size: 14px; color: var(--awq-neon-green); display: none; }
+        .awq-captcha-text { color: var(--awq-text-main); font-size: 15px; font-weight: 500; user-select: none; }
+        .awq-captcha-logo { text-align: right; }
+        .awq-captcha-logo i { font-size: 24px; color: var(--awq-accent-blue); margin-bottom: 2px; }
+        .awq-captcha-logo p { font-size: 10px; color: var(--awq-text-muted); font-weight: bold; letter-spacing: 0.5px; }
+        .awq-captcha-loading { width: 18px; height: 18px; border: 2px solid transparent; border-top-color: var(--awq-accent-blue); border-radius: 50%; display: none; animation: awq-spin 0.8s linear infinite; }
+        @keyframes awq-spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div id="awq-uam-overlay">
+        <div class="awq-uam-wrapper">
+            <div class="awq-uam-title">AWQ<span>SECURITY</span></div>
+            <div id="awq-txt" class="awq-uam-loading-text"><i class="fa-solid fa-circle-notch fa-spin"></i> Tarayıcınız kontrol ediliyor, lütfen bekleyin...</div>
+            <div id="awq-bar" class="awq-uam-bar-bg"><div id="awq-fill" class="awq-uam-bar-fill"></div></div>
+            <div id="awq-captcha" class="awq-captcha-box">
+                <div class="awq-captcha-left" id="captchaTrigger">
+                    <div class="awq-captcha-check" id="captchaCheck"><i class="fa-solid fa-check"></i><div class="awq-captcha-loading" id="captchaLoad"></div></div>
+                    <span class="awq-captcha-text" id="captchaStatusText">Ben robot değilim</span>
+                </div>
+                <div class="awq-captcha-logo"><i class="fa-solid fa-shield-halved"></i><p>AWQ WAF</p></div>
+            </div>
+        </div>
+    </div>
+    <style>
+        /* --- BEYAZ ANA SİTE NAVBAR VE HERO STİLLERİ --- */
+        .awq-navbar {
+            background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(12px); border-bottom: 1px solid var(--awq-border);
+            padding: 20px 8%; display: flex; justify-content: space-between; align-items: center; position: fixed; width: 100%; top: 0; z-index: 1000;
+        }
+        .awq-logo { font-size: 24px; font-weight: 800; color: var(--awq-text-main); text-decoration: none; }
+        .awq-logo span { color: var(--awq-accent-blue); }
+        .awq-nav-links a { color: var(--awq-text-muted); text-decoration: none; margin-left: 30px; font-size: 15px; font-weight: 500; transition: 0.3s; }
+        .awq-nav-links a:hover { color: var(--awq-accent-blue); }
+        .awq-btn-contact { background: transparent; border: 1px solid var(--awq-accent-blue); color: var(--awq-accent-blue); padding: 8px 20px; border-radius: 20px; text-decoration: none; font-size: 14px; font-weight: 600; transition: 0.3s; }
+        .awq-btn-contact:hover { background: rgba(0, 102, 255, 0.08); }
+        .awq-hero-container { max-width: 1200px; margin: 160px auto 80px auto; padding: 0 20px; display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 40px; align-items: center; }
+        .awq-badge { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; background: rgba(0, 102, 255, 0.05); border: 1px solid var(--awq-border); color: var(--awq-accent-blue); border-radius: 30px; font-size: 13px; font-weight: 600; margin-bottom: 25px; }
+        .awq-badge i { color: var(--awq-neon-green); }
+        .awq-hero-content h1 { font-size: 46px; font-weight: 800; color: var(--awq-text-main); line-height: 1.2; margin-bottom: 20px; }
+        .awq-hero-content p { color: var(--awq-text-muted); font-size: 18px; margin-bottom: 35px; max-width: 600px; }
+        .awq-action-buttons { display: flex; gap: 20px; }
+        .awq-btn-primary { background: linear-gradient(135deg, var(--awq-accent-blue) 0%, var(--awq-accent-glow) 100%); color: #ffffff; border: none; padding: 14px 30px; border-radius: 8px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 15px rgba(0, 102, 255, 0.2); transition: 0.3s; text-decoration: none; }
+        .awq-btn-primary:hover { box-shadow: 0 6px 22px rgba(0, 102, 255, 0.4); transform: translateY(-2px); }
+        .awq-btn-secondary { background: #ffffff; border: 1px solid var(--awq-border); color: var(--awq-text-main); padding: 14px 30px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.3s; text-decoration: none; }
+        .awq-btn-secondary:hover { border-color: var(--awq-accent-blue); background: var(--awq-bg-card); }
+        .awq-hero-visual { display: flex; justify-content: center; }
+        .awq-shield-glow { width: 280px; height: 280px; background: var(--awq-bg-card); border: 1px solid var(--awq-border); border-radius: 24px; display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 10px 30px rgba(0,0,0,0.02); border-color: rgba(0, 102, 255, 0.2); animation: awq-pulse 3s infinite alternate; }
+        .awq-shield-glow i { font-size: 85px; color: var(--awq-accent-blue); margin-bottom: 20px; }
+        .awq-shield-glow span { font-size: 13px; color: var(--awq-text-muted); text-transform: uppercase; letter-spacing: 2px; font-weight: bold; }
+        @keyframes awq-pulse { 0% { box-shadow: 0 10px 30px rgba(0, 102, 255, 0.03); border-color: rgba(0, 102, 255, 0.2); } 100% { box-shadow: 0 15px 40px rgba(0, 102, 255, 0.15); border-color: rgba(0, 102, 255, 0.5); } }
+    </style>
+
+    <nav class="awq-navbar">
+        <a href="#" class="awq-logo">AWQ<span>SECURITY</span></a>
+        <div class="awq-nav-links">
+            <a href="#ozellikler">Özellikler</a><a href="#paketler">Paketler</a><a href="admin.html" class="awq-btn-contact">Yönetim Paneli</a>
+        </div>
+    </nav>
+
+    <section class="awq-hero-container">
+        <div class="awq-hero-content">
+            <div class="awq-badge"><i class="fa-solid fa-circle-check"></i> Yeni Nesil Küresel Bulut Altyapısı Aktif</div>
+            <h1>Gerçek Zamanlı Anti-DDoS + WAF Altyapısı</h1>
+            <p>AWQ SECURITY küresel Anycast ağı ile web sitelerinizi, API'lerinizi ve uygulamalarınızı Layer 3-7 siber saldırılarına karşı milisaniyeler içinde koruyun. Sıfır gecikme, yapay zeka tabanlı dinamik filtreleme.</p>
+            <div class="awq-action-buttons">
+                <a href="#paketler" class="awq-btn-primary">Hemen Başla</a>
+                <a href="#ozellikler" class="awq-btn-secondary">Altyapıyı İncele</a>
+            </div>
+        </div>
+        <div class="awq-hero-visual">
+            <div class="awq-shield-glow">
+                <i class="fa-solid fa-shield-halved"></i>
+                <span>AWQ CORE ACTIVE</span>
+            </div>
+        </div>
+    </section>
+    <style>
+        /* --- İSTATİSTİK ŞERİDİ VE YENİ İKONLU KARTLAR --- */
+        .awq-stats-strip { max-width: 1200px; margin: 0 auto 100px auto; padding: 0 20px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+        .awq-stat-card { background: var(--awq-bg-card); border: 1px solid var(--awq-border); padding: 25px; border-radius: 12px; text-align: center; }
+        .awq-stat-card h3 { font-size: 32px; color: var(--awq-text-main); font-weight: 700; margin-bottom: 5px; }
+        .awq-stat-card p { color: var(--awq-text-muted); font-size: 14px; }
+        .awq-features-section { max-width: 1200px; margin: 0 auto 100px auto; padding: 0 20px; }
+        .awq-section-title { text-align: center; margin-bottom: 60px; }
+        .awq-section-title h2 { font-size: 36px; font-weight: 800; margin-bottom: 15px; color: var(--awq-text-main); }
+        .awq-section-title p { color: var(--awq-text-muted); font-size: 16px; }
+        .awq-features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; }
+        .awq-feature-card { background: var(--awq-bg-card); border: 1px solid var(--awq-border); padding: 35px; border-radius: 16px; transition: all 0.4s ease; }
+        .awq-feature-card:hover { border-color: rgba(0, 102, 255, 0.3); box-shadow: 0 12px 30px rgba(0, 102, 255, 0.05); transform: translateY(-5px); }
+        .awq-feature-icon { width: 52px; height: 52px; background: rgba(0, 102, 255, 0.06); border: 1px solid rgba(0, 102, 255, 0.15); border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 22px; }
+        .awq-feature-icon i { font-size: 24px; color: var(--awq-accent-blue); }
+        .awq-feature-card h3 { font-size: 20px; margin-bottom: 12px; color: var(--awq-text-main); }
+        .awq-feature-card p { color: var(--awq-text-muted); font-size: 15px; }
+    </style>
+
+    <section class="awq-stats-strip">
+        <div class="awq-stat-card"><h3>300 Tbps+</h3><p>Küresel Ağ Kapasitesi</p></div>
+        <div class="awq-stat-card"><h3>&lt; 15ms</h3><p>Ortalama Yanıt Süresi</p></div>
+        <div class="awq-stat-card"><h3>%99.99</h3><p>Erişilebilirlik SLA</p></div>
+        <div class="awq-stat-card"><h3>330+</h3><p>Küresel Edge Lokasyonu</p></div>
+    </section>
+
+    <section id="ozellikler" class="awq-features-section">
+        <div class="awq-section-title"><h2>Neden AWQ SECURITY?</h2><p>Kurumsal seviyede koruma mimarisi, tamamen kod gerektirmeyen entegrasyon paneli.</p></div>
+        <div class="awq-features-grid">
+            <div class="awq-feature-card">
+                <!-- Gri Kutu Yerine Siber Göz İkonu Eklendi -->
+                <div class="awq-feature-icon"><i class="fa-solid fa-user-secret"></i></div>
+                <h3>Arka Sunucu Gizleme</h3>
+                <p>Gerçek IP adresiniz ağımız arkasında tamamen maskelenir. Origin sunucunuz siber korsanlar tarafından asla ifşa edilemez.</p>
+            </div>
+            <div class="awq-feature-card">
+                <!-- Gri Kutu Yerine Küresel Dünya İkonu Eklendi -->
+                <div class="awq-feature-icon"><i class="fa-solid fa-globe"></i></div>
+                <h3>Ultra Hızlı Anycast CDN</h3>
+                <p>Dünya nüfusunun %95'ine 30ms'den daha yakın edge veri merkezlerimiz ile sitenizi jet hızında önbelleğe alın ve hızlandırın.</p>
+            </div>
+            <div class="awq-feature-card">
+                <!-- Gri Kutu Yerine Kalkan İkonu Eklendi -->
+                <div class="awq-feature-icon"><i class="fa-solid fa-shield-halved"></i></div>
+                <h3>Gelişmiş WAF Motoru</h3>
+                <p>SQL Injection, XSS ve OWASP Top 10 açıklarına karşı yapay zeka destekli, imza tabanlı kurallarla anlık akıllı engelleme.</p>
+            </div>
+        </div>
+    </section>
+    <style>
+        /* --- FİYATLANDIRMA, TELEGRAM BANNER VE SİHİRLİ JS MOTORU --- */
+        .awq-pricing-section { max-width: 1200px; margin: 0 auto 100px auto; padding: 0 20px; }
+        .awq-pricing-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 40px; max-width: 900px; margin: 0 auto; }
+        .awq-price-card { background: var(--awq-bg-card); border: 1px solid var(--awq-border); padding: 40px; border-radius: 20px; position: relative; transition: all 0.4s ease; }
+        .awq-price-card.featured { border-color: var(--awq-accent-blue); box-shadow: 0 10px 30px rgba(0, 102, 255, 0.05); }
+        .awq-price-badge { position: absolute; top: 20px; right: 20px; background: var(--awq-accent-blue); color: #ffffff; padding: 4px 12px; border-radius: 12px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
+        .awq-price-card h3 { font-size: 24px; margin-bottom: 10px; color: var(--awq-text-main); }
+        .awq-price-amount { font-size: 42px; font-weight: 800; color: var(--awq-text-main); margin-bottom: 5px; }
+        .awq-price-amount span { font-size: 16px; color: var(--awq-text-muted); font-weight: 400; }
+        .awq-price-desc { color: var(--awq-text-muted); font-size: 14px; margin-bottom: 25px; border-bottom: 1px solid var(--awq-border); padding-bottom: 15px; }
+        .awq-price-features { list-style: none; margin-bottom: 35px; }
+        .awq-price-features li { margin-bottom: 12px; font-size: 15px; color: var(--awq-text-muted); display: flex; align-items: center; gap: 10px; }
+        .awq-price-features li i { color: var(--awq-neon-green); }
+        .awq-telegram-banner { max-width: 1200px; margin: 0 auto 80px auto; padding: 0 20px; }
+        .awq-tg-box { background: linear-gradient(135deg, #f8f9fa 0%, #e6f0ff 100%); border: 1px solid var(--awq-border); border-radius: 20px; padding: 40px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.02); }
+        .awq-tg-box i { font-size: 48px; color: #2481cc; margin-bottom: 15px; }
+        .awq-tg-box h2 { font-size: 26px; margin-bottom: 10px; color: var(--awq-text-main); }
+        .awq-tg-box p { color: var(--awq-text-muted); margin-bottom: 20px; }
+        .awq-tg-link { display: inline-block; background: #2481cc; color: white; text-decoration: none; padding: 12px 30px; border-radius: 30px; font-weight: 600; transition: 0.3s; }
+        .awq-tg-link:hover { background: #1c6fa3; box-shadow: 0 5px 15px rgba(36, 129, 204, 0.3); transform: translateY(-1px); }
+        footer { border-top: 1px solid var(--awq-border); padding: 30px 20px; text-align: center; color: var(--awq-text-muted); font-size: 14px; }
+    </style>
+
+    <section id="paketler" class="awq-pricing-section">
+        <div class="awq-section-title"><h2>Hizmet Paketlerimiz</h2><p>İhtiyacınıza en uygun siber savunma kalkanını seçin, korumayı anında başlatın.</p></div>
+        <div class="awq-pricing-grid">
+            <div class="awq-price-card">
+                <h3>Essential</h3><div class="awq-price-amount">₺200 <span>/ ay</span></div><div class="awq-price-desc">≈ $5 USD / ay • Aylık faturalandırma</div>
+                <ul class="awq-price-features">
+                    <li><i class="fa-solid fa-check"></i> 1 Ana Domain + 6 Subdomain desteği</li><li><i class="fa-solid fa-check"></i> Küresel CDN & Hızlı Akıllı DNS</li><li><i class="fa-solid fa-check"></i> Web Analitiği & 100k İstek kotası</li><li><i class="fa-solid fa-check"></i> Akıllı Katman 3/4 DDoS Koruması</li><li><i class="fa-solid fa-check"></i> Gelişmiş WAF + 20 Özel Kural</li>
+                </ul>
+                <a href="https://t.me" target="_blank" class="awq-btn-secondary" style="display:block; text-align:center;">Satın Al</a>
+            </div>
+            <div class="awq-price-card featured">
+                <div class="awq-price-badge">Önerilen</div><h3>Pro</h3><div class="awq-price-amount">₺500 <span>/ ay</span></div><div class="awq-price-desc">≈ $13 USD / ay • Aylık ödeme</div>
+                <ul class="awq-price-features">
+                    <li><i class="fa-solid fa-check"></i> ∞ Ana Domain + SINIRSIZ Subdomain</li><li><i class="fa-solid fa-check"></i> En yüksek seviye Layer 7 Akıllı Filtreleme</li><li><i class="fa-solid fa-check"></i> %100 Uptime SLA & Kredi Garantisi</li><li><i class="fa-solid fa-check"></i> Öncelikli Canlı Destek Bileti</li><li><i class="fa-solid fa-check"></i> Gelişmiş Derin Güvenlik Analitiği</li><li><i class="fa-solid fa-check"></i> Özel SSL Sertifikası Yükleme</li>
+                </ul>
+                <a href="https://t.me" target="_blank" class="awq-btn-primary" style="display:block; text-align:center;">Satın Al</a>
+            </div>
+        </div>
+    </section>
+
+    <section class="awq-telegram-banner">
+        <div class="awq-tg-box"><i class="fa-brands fa-telegram"></i><h2>Resmi İletişim ve Duyuru Hattı</h2><p>Güncel duyurular, teknik destek talepleri ve özel kurumsal entegrasyonlar için bize ulaşın.</p><a href="https://t.me" target="_blank" class="awq-tg-link">TELEGRAM: @l7run</a></div>
+    </section>
+
+    <footer><p>© 2026 AWQ SECURITY - Yüksek performanslı Anti-DDoS ve Web Uygulama Güvenlik Duvarı Sistemleri.</p></footer>
+
+    <script>
+        window.addEventListener('DOMContentLoaded', () => {
+            const fill = document.getElementById('awq-fill'); const txt = document.getElementById('awq-txt');
+            const bar = document.getElementById('awq-bar'); const captcha = document.getElementById('awq-captcha');
+            const trigger = document.getElementById('captchaTrigger'); const load = document.getElementById('captchaLoad');
+            const statusText = document.getElementById('captchaStatusText'); const checkIcon = document.querySelector('#captchaCheck i');
+            const overlay = document.getElementById('awq-uam-overlay');
+
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += 2; fill.style.width = progress + '%';
+                if(progress >= 100) {
+                    clearInterval(interval);
+                    txt.classList.add('awq-fade-slide-out'); bar.classList.add('awq-fade-slide-out');
+                    setTimeout(() => {
+                        txt.style.display = 'none'; bar.style.display = 'none';
+                        captcha.style.display = 'flex';
+                        setTimeout(() => { captcha.style.opacity = '1'; captcha.style.transform = 'scale(1)'; }, 50);
+                    }, 500);
+                }
+            }, 40);
+
+            trigger.addEventListener('click', () => {
+                if(load.style.display === 'block' || checkIcon.style.display === 'block') return;
+                load.style.display = 'block'; statusText.innerText = 'Doğrulanıyor...';
+                setTimeout(() => {
+                    load.style.display = 'none'; checkIcon.style.display = 'block';
+                    statusText.style.color = 'var(--awq-neon-green)'; statusText.innerText = 'Erişim Onaylandı!';
+                    setTimeout(() => { overlay.style.opacity = '0'; overlay.style.visibility = 'hidden'; }, 1000);
+                }, 2000);
+            });
+        });
+    </script>
+</body>
+</html>
+
