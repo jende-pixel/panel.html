@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Girişi - Wancord</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body style="display: flex; justify-content: center; align-items: center; height: 100vh;">
+    <div class="forum-card" style="width: 100%; max-width: 400px; text-align: center;">
+        <h2 style="margin-bottom: 20px;">Yönetici Paneli</h2>
+        <form id="loginForm" style="display: flex; flex-direction: column; gap: 15px;">
+            <input type="password" id="adminPassword" placeholder="Admin Şifresi" style="background: var(--bg-dark); border: 1px solid var(--border-color); padding: 12px; border-radius: 8px; color: white;" required>
+            <button type="submit" class="btn-new-topic" style="margin: 0;">Giriş Yap</button>
+        </form>
+        <p id="sonucMesaji" style="margin-top: 15px; font-weight: bold;"></p>
+    </div>
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const password = document.getElementById('adminPassword').value;
+            const mesajAlani = document.getElementById('sonucMesaji');
+
+            const response = await fetch('/api/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password: password })
+            });
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+                mesajAlani.style.color = "#4ade80";
+                mesajAlani.innerText = "Başarılı! Giriş yapıldı.";
+            } else {
+                mesajAlani.style.color = "#f87171";
+                mesajAlani.innerText = result.message;
+            }
+        });
+    </script>
+</body>
+</html>
+
